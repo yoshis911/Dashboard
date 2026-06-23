@@ -168,23 +168,18 @@
     function generatePlusCode(latitude, longitude) {
         const ALPHABET = "23456789CFGHJMPQRVWX";
         
-        // Clip coordinates to valid ranges
         let lat = Math.min(Math.max(latitude, -90), 90);
         let lon = longitude;
         while (lon < -180) lon += 360;
         while (lon >= 180) lon -= 360;
 
-        // Shift coordinates to positive ranges
         lat += 90;
         lon += 180;
 
         let code = "";
-        
-        // Compute the first 10 pairs/characters
         let latDigitValue = 20;
         let lonDigitValue = 20;
         
-        // Pair calculations (First 4 pairs, 8 characters total)
         for (let i = 0; i < 4; i++) {
             let latDigit = Math.floor(lat / latDigitValue);
             let lonDigit = Math.floor(lon / lonDigitValue);
@@ -198,10 +193,8 @@
             lonDigitValue /= 20;
         }
 
-        // Insert the required Plus Code separator
         code = code.substring(0, 8) + "+" + code.substring(8);
 
-        // Add the 5th pair (Final 2 characters to create a full 10-character global code)
         let finalLatDigit = Math.floor(lat / latDigitValue);
         let finalLonDigit = Math.floor(lon / lonDigitValue);
         code += ALPHABET[finalLatDigit] + ALPHABET[finalLonDigit];
@@ -211,20 +204,23 @@
         el.textContent = code;
     }
 
-    // Weather via Open-Meteo API
+    // Weather via Open-Meteo API (Updated to current_weather -> current parameters)
     function fetchWeatherData(lat, lon) {
-        const url = `https://open-meteo.com{lat}&longitude=${lon}&current_weather=true`;
+        // Open-Meteo updated their query structure. Passing 'current' instead of legacy 'current_weather'
+        const url = `https://open-meteo.com{lat}&longitude=${lon}&current=temperature_2m,weather_code`;
         
         fetch(url)
             .then(res => res.json())
             .then(data => {
                 const el = document.getElementById('weather');
                 el.classList.remove('loading');
-                if (data.current_weather) {
-                    const tempC = data.current_weather.temperature;
+                
+                // Read from the modern 'current' data block structure
+                if (data && data.current) {
+                    const tempC = data.current.temperature_2m;
                     const tempF = ((tempC * 9/5) + 32).toFixed(1);
+                    const code = data.current.weather_code;
                     
-                    const code = data.current_weather.weathercode;
                     let condition = "Clear";
                     if (code >= 1 && code <= 3) condition = "Partly Cloudy";
                     if (code >= 45 && code <= 48) condition = "Foggy";
@@ -235,11 +231,12 @@
 
                     el.textContent = `${tempF}°F (${tempC}°C) — ${condition}`;
                 } else {
-                    el.textContent = "Weather data unavailable.";
+                    el.textContent = "Weather layout error.";
                 }
             })
-            .catch(() => {
-                document.getElementById('weather').textContent = "Error loading weather data.";
+            .catch((err) => {
+                document.getElementById('weather').textContent = "Network error loading weather.";
+                console.error(err);
             });
     }
 </script>
