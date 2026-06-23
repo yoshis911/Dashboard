@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Location & Weather Dashboard</title>
+    <!-- Open Location Code (Plus Codes) Official Library (UMD build on jsDelivr) -->
+    <script src="https://cdn.jsdelivr.net/npm/@googlemaps/open-location-code@1.0.6/dist/openlocationcode.umd.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -174,7 +176,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // --- 2. Pure JS Google Plus Code Encoder (Zero Dependencies) ---
+        // --- 2. Pure JS Google Plus Code Encoder (fallback) ---
         function encodePlusCode(latitude, longitude) {
             const ALPHABET = "23456789CFGHJMPQRVWX";
             
@@ -231,11 +233,17 @@
             document.getElementById('lat').textContent = lat.toFixed(6);
             document.getElementById('lon').textContent = lon.toFixed(6);
 
-            // Calculate Plus Code locally with zero network reliance
+            // Prefer official OpenLocationCode if loaded; fall back to local implementation
             try {
-                const globalPlusCode = encodePlusCode(lat, lon);
+                let globalPlusCode;
+                if (typeof OpenLocationCode !== 'undefined' && OpenLocationCode && typeof OpenLocationCode.encode === 'function') {
+                    globalPlusCode = OpenLocationCode.encode(lat, lon);
+                } else {
+                    globalPlusCode = encodePlusCode(lat, lon);
+                }
                 document.getElementById('plus-code').textContent = globalPlusCode;
             } catch (e) {
+                console.warn('Plus code generation failed', e);
                 document.getElementById('plus-code').textContent = "Calculation Error";
             }
 
@@ -245,36 +253,50 @@
 
         function errorLocation(error) {
             let msg = "GPS Signal Error. Check device location permissions.";
-            if (error.code === 1) {
+            if (error && error.code === 1) {
                 msg = "Please allow location permissions in your browser bar.";
-            } else if (error.code === 3) {
-                msg = "GPS tracking timed out. Retrying link...";
+            } else if (error && error.code === 3) {
+                msg = "GPS tracking timed out. Retrying...";
             }
             document.getElementById('error-msg').textContent = msg;
         }
 
-        // --- 4. Weather Sync ---
+        // --- 4. Weather Sync (fixed Open-Meteo usage) ---
         async function fetchWindData(lat, lon) {
             try {
-                const url = `https://open-meteo.com{lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph`;
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=windgusts_10m&windspeed_unit=mph&timezone=auto`;
                 const response = await fetch(url);
-                if (!response.ok) throw new Error();
-                
+                if (!response.ok) throw new Error(`Weather fetch failed (${response.status})`);
                 const data = await response.json();
-                const current = data.current;
+
+                const current = data.current_weather;
+                if (!current) throw new Error('No current_weather in response');
 
                 const degreesToCompass = (deg) => {
+                    if (deg == null || isNaN(deg)) return "N/A";
                     const idx = Math.floor((deg / 22.5) + 0.5) % 16;
                     const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-                    return `${arr[idx]} (${deg}°)`;
+                    return `${arr[idx]} (${Math.round(deg)}°)`;
                 };
 
-                document.getElementById('wind-speed').textContent = `${current.wind_speed_10m} mph`;
-                document.getElementById('wind-dir').textContent = degreesToCompass(current.wind_direction_10m);
-                document.getElementById('wind-gusts').textContent = `${current.wind_gusts_10m} mph`;
-                document.getElementById('error-msg').textContent = ""; 
+                let gustsDisplay = "N/A";
+                if (data.hourly && Array.isArray(data.hourly.time) && Array.isArray(data.hourly.windgusts_10m)) {
+                    const idx = data.hourly.time.indexOf(current.time);
+                    if (idx !== -1 && data.hourly.windgusts_10m[idx] != null) {
+                        gustsDisplay = `${data.hourly.windgusts_10m[idx]} mph`;
+                    } else {
+                        const last = data.hourly.windgusts_10m[data.hourly.windgusts_10m.length - 1];
+                        if (last != null) gustsDisplay = `${last} mph`;
+                    }
+                }
+
+                document.getElementById('wind-speed').textContent = `${current.windspeed} mph`;
+                document.getElementById('wind-dir').textContent = degreesToCompass(current.winddirection);
+                document.getElementById('wind-gusts').textContent = gustsDisplay;
+                document.getElementById('error-msg').textContent = "";
 
             } catch (error) {
+                console.error(error);
                 document.getElementById('wind-speed').textContent = "Offline";
                 document.getElementById('wind-dir').textContent = "Offline";
                 document.getElementById('wind-gusts').textContent = "Offline";
