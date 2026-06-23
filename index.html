@@ -72,7 +72,6 @@
             line-height: 1.4;
         }
 
-        /* Grid layout for wind data */
         .wind-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -166,7 +165,6 @@
 </div>
 
 <script>
-    // Live ticking clock loop
     function updateClock() {
         const now = new Date();
         const options = { 
@@ -178,7 +176,6 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Trigger precise browser geolocation
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(successHandler, errorHandler, {
             enableHighAccuracy: true,
@@ -210,15 +207,18 @@
     function showGlobalError(msg) {
         ['coordinates', 'pluscode'].forEach(id => {
             const el = document.getElementById(id);
-            el.className = "error";
-            el.textContent = msg;
+            if(el) {
+                el.className = "error";
+                el.textContent = msg;
+            }
         });
         const statusEl = document.getElementById('wind-status');
-        statusEl.className = "error";
-        statusEl.textContent = msg;
+        if(statusEl) {
+            statusEl.className = "error";
+            statusEl.textContent = msg;
+        }
     }
 
-    // Mathematical Open Location Grid Generator (No API calls required)
     function generatePlusCode(latitude, longitude) {
         const ALPHABET = "23456789CFGHJMPQRVWX";
         let lat = Math.min(Math.max(latitude, -90), 90) + 90;
@@ -245,32 +245,28 @@
         code += ALPHABET[Math.floor(lat / latDigitValue)] + ALPHABET[Math.floor(lon / lonDigitValue)];
 
         const el = document.getElementById('pluscode');
-        el.classList.remove('loading');
-        el.textContent = code;
+        if(el) {
+            el.classList.remove('loading');
+            el.textContent = code;
+        }
     }
 
-    // Wind Handler featuring Hybrid Data Delivery Pipelines
     function fetchWindData(lat, lon) {
-        // Request strictly wind speed and wind gusts metrics
         const openMeteoUrl = `https://open-meteo.com{lat}&longitude=${lon}&current=wind_speed_10m,wind_gusts_10m&timezone=auto`;
-        
-        // Backup proxy tunnel target
         const proxyUrl = `https://allorigins.win{encodeURIComponent(openMeteoUrl)}`;
 
-        // Execution Pipeline 1: Direct Native Request
         fetch(openMeteoUrl)
             .then(res => {
-                if (!res.ok) throw new Error("Primary API endpoint block");
+                if (!res.ok) throw new Error("Primary API block");
                 return res.json();
             })
             .then(data => renderWindDOM(data))
             .catch(err => {
-                console.warn("Direct pipeline restricted. Activating Failover Tunnel Proxy...", err);
+                console.warn("Direct pipeline restricted. Trying tunnel...", err);
                 
-                // Execution Pipeline 2: Fallback Proxy Request
                 fetch(proxyUrl)
                     .then(res => {
-                        if (!res.ok) throw new Error("Failover network degradation");
+                        if (!res.ok) throw new Error("Tunnel failed");
                         return res.json();
                     })
                     .then(wrapper => {
@@ -279,30 +275,32 @@
                     })
                     .catch(finalErr => {
                         const el = document.getElementById('wind-status');
-                        el.className = "error";
-                        el.textContent = "Data blocked by mobile provider/firewall rules.";
-                        console.error("All delivery streams exhausted.", finalErr);
+                        if(el) {
+                            el.className = "error";
+                            el.textContent = "Network error loading weather.";
+                        }
+                        console.error(finalErr);
                     });
             });
     }
 
-    // UI Processing Engine for Wind Data
     function renderWindDOM(data) {
         const statusEl = document.getElementById('wind-status');
         
         if (data && data.current) {
-            statusEl.style.display = "none"; // Hide loading status smoothly
+            if(statusEl) statusEl.style.display = "none";
 
-            // Read metrics
             const speedKmH = data.current.wind_speed_10m;
             const gustsKmH = data.current.wind_gusts_10m;
             
-            // Convert to MPH
             const speedMpH = (speedKmH * 0.621371).toFixed(1);
             const gustsMpH = (gustsKmH * 0.621371).toFixed(1);
 
-            // Display in DOM
-document.getElementById('wind-speed').innerHTML = ${speedMpH} <span style="font-size:0.8rem; 
-    font-weight:normal; 
-            color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${speedKmH} km/h</span>;document.getElementById('wind-gusts').innerHTML = ${gustsMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${gustsKmH} km/h</span>;} else {statusEl.className = "error";statusEl.textContent = "Data payload format error.";
-        }}
+            const speedEl = document.getElementById('wind-speed');
+            const gustsEl = document.getElementById('wind-gusts');
+
+            if(speedEl) {
+                speedEl.innerHTML = `${speedMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${speedKmH} km/h</span>`;
+            }
+            if(gustsEl) {
+                gustsEl.innerHTML = ${gustsMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${gustsKmH} km/h</span>;}} else {if(statusEl) {statusEl.className = "error";statusEl.textContent = "Data parsing error.";}}}
