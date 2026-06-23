@@ -303,4 +303,6 @@
                 speedEl.innerHTML = `${speedMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${speedKmH} km/h</span>`;
             }
             if(gustsEl) {
-                gustsEl.innerHTML = ${gustsMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${gustsKmH} km/h</span>;}} else {if(statusEl) {statusEl.className = "error";statusEl.textContent = "Data parsing error.";}}}
+                gustsEl.innerHTML = ${gustsMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${gustsKmH} km/h</span>;
+                    }
+        } else {if(statusEl) {statusEl.className = "error";statusEl.textContent = "Data parsing error.";}}}
