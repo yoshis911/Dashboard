@@ -11,6 +11,7 @@
             --text-main: #f8fafc;
             --text-sub: #94a3b8;
             --accent: #38bdf8;
+            --border-color: #334155;
         }
 
         body {
@@ -26,28 +27,31 @@
 
         .container {
             width: 100%;
-            max-width: 500px;
-            padding: 20px;
+            max-width: 480px;
+            padding: 16px;
+            box-sizing: border-box;
         }
 
         .card {
             background-color: var(--card-bg);
-            border-radius: 16px;
+            border-radius: 20px;
             padding: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
         }
 
         h1 {
             margin-top: 0;
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             color: var(--accent);
-            border-bottom: 2px solid #334155;
+            border-bottom: 2px solid var(--border-color);
             padding-bottom: 12px;
+            margin-bottom: 24px;
+            text-align: center;
         }
 
         .section {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .section:last-child {
@@ -55,26 +59,66 @@
         }
 
         .label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        .value {
+            font-size: 1.25rem;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        /* Grid layout for wind data */
+        .wind-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .grid-item {
+            background: rgba(15, 23, 42, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        .grid-label {
+            font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-sub);
             margin-bottom: 4px;
         }
 
-        .value {
+        .grid-value {
             font-size: 1.2rem;
-            font-weight: 500;
+            font-weight: bold;
         }
 
         .error {
-            color: #ef4444;
-            font-size: 0.9rem;
+            color: #f87171;
+            font-size: 0.95rem;
+            background: rgba(248, 113, 113, 0.1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            display: block;
         }
 
         .loading {
             color: var(--text-sub);
             font-style: italic;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
@@ -82,7 +126,7 @@
 
 <div class="container">
     <div class="card">
-        <h1>Dashboard</h1>
+        <h1>Live Dashboard</h1>
         
         <!-- Date & Time -->
         <div class="section">
@@ -102,78 +146,85 @@
             <div id="pluscode" class="value loading">Generating code...</div>
         </div>
 
-        <!-- Weather -->
+        <!-- Wind Conditions -->
         <div class="section">
-            <div class="label">Local Weather</div>
-            <div id="weather" class="value loading">Waiting for location data...</div>
+            <div class="label">Wind Conditions</div>
+            <div id="wind-status" class="loading" style="margin-bottom: 8px; font-size: 0.95rem;">Waiting for location data...</div>
+            
+            <div class="wind-grid">
+                <div class="grid-item">
+                    <div class="grid-label">Wind Speed</div>
+                    <div id="wind-speed" class="grid-value">--</div>
+                </div>
+                <div class="grid-item">
+                    <div class="grid-label">Wind Gusts</div>
+                    <div id="wind-gusts" class="grid-value">--</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // Update live clock
+    // Live ticking clock loop
     function updateClock() {
         const now = new Date();
         const options = { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit' 
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
         };
         document.getElementById('datetime').textContent = now.toLocaleDateString(undefined, options);
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Request user location
+    // Trigger precise browser geolocation
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(successHandler, errorHandler, {
             enableHighAccuracy: true,
-            timeout: 10000
+            timeout: 12000
         });
     } else {
-        document.getElementById('coordinates').className = "error";
-        document.getElementById('coordinates').textContent = "Geolocation is not supported by your browser.";
+        showGlobalError("Geolocation profile not supported by browser.");
     }
 
     function successHandler(position) {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         
-        // Display coordinates
         document.getElementById('coordinates').classList.remove('loading');
-        document.getElementById('coordinates').textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+        document.getElementById('coordinates').textContent = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
 
-        // Process Plus Code and Weather
         generatePlusCode(lat, lon);
-        fetchWeatherData(lat, lon);
+        fetchWindData(lat, lon);
     }
 
     function errorHandler(error) {
-        let msg = "Unable to retrieve your location.";
-        if (error.code === 1) msg = "Location permission denied.";
-        if (error.code === 2) msg = "Location unavailable.";
-        if (error.code === 3) msg = "Location request timed out.";
-        
-        ['coordinates', 'pluscode', 'weather'].forEach(id => {
-            document.getElementById(id).className = "error";
-            document.getElementById(id).textContent = msg;
-        });
+        let msg = "GPS permission block or tracking timeout.";
+        if (error.code === 1) msg = "Location permission denied by user.";
+        if (error.code === 2) msg = "Hardware network location unavailable.";
+        if (error.code === 3) msg = "GPS search process timed out.";
+        showGlobalError(msg);
     }
 
-    // Client-side Open Location Code (Plus Code) Generator Algorithm
+    function showGlobalError(msg) {
+        ['coordinates', 'pluscode'].forEach(id => {
+            const el = document.getElementById(id);
+            el.className = "error";
+            el.textContent = msg;
+        });
+        const statusEl = document.getElementById('wind-status');
+        statusEl.className = "error";
+        statusEl.textContent = msg;
+    }
+
+    // Mathematical Open Location Grid Generator (No API calls required)
     function generatePlusCode(latitude, longitude) {
         const ALPHABET = "23456789CFGHJMPQRVWX";
-        
-        let lat = Math.min(Math.max(latitude, -90), 90);
+        let lat = Math.min(Math.max(latitude, -90), 90) + 90;
         let lon = longitude;
         while (lon < -180) lon += 360;
         while (lon >= 180) lon -= 360;
-
-        lat += 90;
         lon += 180;
 
         let code = "";
@@ -183,63 +234,75 @@
         for (let i = 0; i < 4; i++) {
             let latDigit = Math.floor(lat / latDigitValue);
             let lonDigit = Math.floor(lon / lonDigitValue);
-            
             code += ALPHABET[latDigit] + ALPHABET[lonDigit];
-            
             lat -= latDigit * latDigitValue;
             lon -= lonDigit * lonDigitValue;
-            
             latDigitValue /= 20;
             lonDigitValue /= 20;
         }
 
         code = code.substring(0, 8) + "+" + code.substring(8);
-
-        let finalLatDigit = Math.floor(lat / latDigitValue);
-        let finalLonDigit = Math.floor(lon / lonDigitValue);
-        code += ALPHABET[finalLatDigit] + ALPHABET[finalLonDigit];
+        code += ALPHABET[Math.floor(lat / latDigitValue)] + ALPHABET[Math.floor(lon / lonDigitValue)];
 
         const el = document.getElementById('pluscode');
         el.classList.remove('loading');
         el.textContent = code;
     }
 
-    // Weather via Open-Meteo API (Updated to current_weather -> current parameters)
-    function fetchWeatherData(lat, lon) {
-        // Open-Meteo updated their query structure. Passing 'current' instead of legacy 'current_weather'
-        const url = `https://open-meteo.com{lat}&longitude=${lon}&current=temperature_2m,weather_code`;
+    // Wind Handler featuring Hybrid Data Delivery Pipelines
+    function fetchWindData(lat, lon) {
+        // Request strictly wind speed and wind gusts metrics
+        const openMeteoUrl = `https://open-meteo.com{lat}&longitude=${lon}&current=wind_speed_10m,wind_gusts_10m&timezone=auto`;
         
-        fetch(url)
-            .then(res => res.json())
-            .then(data => {
-                const el = document.getElementById('weather');
-                el.classList.remove('loading');
-                
-                // Read from the modern 'current' data block structure
-                if (data && data.current) {
-                    const tempC = data.current.temperature_2m;
-                    const tempF = ((tempC * 9/5) + 32).toFixed(1);
-                    const code = data.current.weather_code;
-                    
-                    let condition = "Clear";
-                    if (code >= 1 && code <= 3) condition = "Partly Cloudy";
-                    if (code >= 45 && code <= 48) condition = "Foggy";
-                    if (code >= 51 && code <= 67) condition = "Rainy";
-                    if (code >= 71 && code <= 77) condition = "Snowy";
-                    if (code >= 80 && code <= 82) condition = "Rain Showers";
-                    if (code >= 95) condition = "Thunderstorm";
+        // Backup proxy tunnel target
+        const proxyUrl = `https://allorigins.win{encodeURIComponent(openMeteoUrl)}`;
 
-                    el.textContent = `${tempF}°F (${tempC}°C) — ${condition}`;
-                } else {
-                    el.textContent = "Weather layout error.";
-                }
+        // Execution Pipeline 1: Direct Native Request
+        fetch(openMeteoUrl)
+            .then(res => {
+                if (!res.ok) throw new Error("Primary API endpoint block");
+                return res.json();
             })
-            .catch((err) => {
-                document.getElementById('weather').textContent = "Network error loading weather.";
-                console.error(err);
+            .then(data => renderWindDOM(data))
+            .catch(err => {
+                console.warn("Direct pipeline restricted. Activating Failover Tunnel Proxy...", err);
+                
+                // Execution Pipeline 2: Fallback Proxy Request
+                fetch(proxyUrl)
+                    .then(res => {
+                        if (!res.ok) throw new Error("Failover network degradation");
+                        return res.json();
+                    })
+                    .then(wrapper => {
+                        const data = JSON.parse(wrapper.contents);
+                        renderWindDOM(data);
+                    })
+                    .catch(finalErr => {
+                        const el = document.getElementById('wind-status');
+                        el.className = "error";
+                        el.textContent = "Data blocked by mobile provider/firewall rules.";
+                        console.error("All delivery streams exhausted.", finalErr);
+                    });
             });
     }
-</script>
 
-</body>
-</html>
+    // UI Processing Engine for Wind Data
+    function renderWindDOM(data) {
+        const statusEl = document.getElementById('wind-status');
+        
+        if (data && data.current) {
+            statusEl.style.display = "none"; // Hide loading status smoothly
+
+            // Read metrics
+            const speedKmH = data.current.wind_speed_10m;
+            const gustsKmH = data.current.wind_gusts_10m;
+            
+            // Convert to MPH
+            const speedMpH = (speedKmH * 0.621371).toFixed(1);
+            const gustsMpH = (gustsKmH * 0.621371).toFixed(1);
+
+            // Display in DOM
+document.getElementById('wind-speed').innerHTML = ${speedMpH} <span style="font-size:0.8rem; 
+    font-weight:normal; 
+            color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${speedKmH} km/h</span>;document.getElementById('wind-gusts').innerHTML = ${gustsMpH} <span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub);">MPH</span><br><span style="font-size:0.9rem; font-weight:normal; color:var(--text-sub);">${gustsKmH} km/h</span>;} else {statusEl.className = "error";statusEl.textContent = "Data payload format error.";
+        }}
