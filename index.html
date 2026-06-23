@@ -96,6 +96,218 @@
             <div id="coordinates" class="value loading">Acquiring GPS fix...</div>
         </div>
 
+        <!-- Google Plus Code -->
+        <div class="section">
+            <div class="label">Google Plus Code</div>
+            <div id="pluscode" class="value loading">Generating code...</div>
+        </div>
+
+        <!-- Weather -->
+        <div class="section">
+            <div class="label">Local Weather</div>
+            <div id="weather" class="value loading">Waiting for location data...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update live clock
+    function updateClock() {
+        const now = new Date();
+        const options = { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        };
+        document.getElementById('datetime').textContent = now.toLocaleDateString(undefined, options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Request user location
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(successHandler, errorHandler, {
+            enableHighAccuracy: true,
+            timeout: 10000
+        });
+    } else {
+        document.getElementById('coordinates').className = "error";
+        document.getElementById('coordinates').textContent = "Geolocation is not supported by your browser.";
+    }
+
+    function successHandler(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        
+        // Display coordinates
+        document.getElementById('coordinates').classList.remove('loading');
+        document.getElementById('coordinates').textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+
+        // Process Plus Code and Weather
+        generatePlusCode(lat, lon);
+        fetchWeatherData(lat, lon);
+    }
+
+    function errorHandler(error) {
+        let msg = "Unable to retrieve your location.";
+        if (error.code === 1) msg = "Location permission denied.";
+        if (error.code === 2) msg = "Location unavailable.";
+        if (error.code === 3) msg = "Location request timed out.";
+        
+        ['coordinates', 'pluscode', 'weather'].forEach(id => {
+            document.getElementById(id).className = "error";
+            document.getElementById(id).textContent = msg;
+        });
+    }
+
+    // Client-side Open Location Code (Plus Code) Generator Algorithm
+    function generatePlusCode(latitude, longitude) {
+        const ALPHABET = "23456789CFGHJMPQRVWX";
+        
+        // Clip coordinates to valid ranges
+        let lat = Math.min(Math.max(latitude, -90), 90);
+        let lon = longitude;
+        while (lon < -180) lon += 360;
+        while (lon >= 180) lon -= 360;
+
+        // Shift coordinates to positive ranges
+        lat += 90;
+        lon += 180;
+
+        let code = "";
+        
+        // Compute the first 10 pairs/characters
+        let latDigitValue = 20;
+        let lonDigitValue = 20;
+        
+        // Pair calculations (First 4 pairs, 8 characters total)
+        for (let i = 0; i < 4; i++) {
+            let latDigit = Math.floor(lat / latDigitValue);
+            let lonDigit = Math.floor(lon / lonDigitValue);
+            
+            code += ALPHABET[latDigit] + ALPHABET[lonDigit];
+            
+            lat -= latDigit * latDigitValue;
+            lon -= lonDigit * lonDigitValue;
+            
+            latDigitValue /= 20;
+            lonDigitValue /= 20;
+        }
+
+        // Insert the required Plus Code separator
+        code = code.substring(0, 8) + "+" + code.substring(8);
+
+        // Add the 5th pair (Final 2 characters to create a full 10-character global code)
+        let finalLatDigit = Math.floor(lat / latDigitValue);
+        let finalLonDigit = Math.floor(lon / lonDigitValue);
+        code += ALPHABET[finalLatDigit] + ALPHABET[finalLonDigit];
+
+        const el = document.getElementById('pluscode');
+        el.classList.remove('loading');
+        el.textContent = code;
+    }
+
+    // Weather via Open-Meteo API
+    function fetchWeatherData(lat, lon) {
+        const url = `https://open-meteo.com{lat}&longitude=${lon}&current_weather=true`;
+        
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                const el = document.getElementById('weather');
+                el.classList.remove('loading');
+                if (data.current_weather) {
+                    const tempC = data.current_weather.temperature;
+                    const tempF = ((tempC * 9/5) + 32).toFixed(1);
+                    
+                    const code = data.current_weather.weathercode;
+                    let condition = "Clear";
+                    if (code >= 1 && code <= 3) condition = "Partly Cloudy";
+                    if (code >= 45 && code <= 48) condition = "Foggy";
+                    if (code >= 51 && code <= 67) condition = "Rainy";
+                    if (code >= 71 && code <= 77) condition = "Snowy";
+                    if (code >= 80 && code <= 82) condition = "Rain Showers";
+                    if (code >= 95) condition = "Thunderstorm";
+
+                    el.textContent = `${tempF}°F (${tempC}°C) — ${condition}`;
+                } else {
+                    el.textContent = "Weather data unavailable.";
+                }
+            })
+            .catch(() => {
+                document.getElementById('weather').textContent = "Error loading weather data.";
+            });
+    }
+</script>
+
+</body>
+</html>
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: var(--accent);
+            border-bottom: 2px solid #334155;
+            padding-bottom: 12px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 4px;
+        }
+
+        .value {
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .error {
+            color: #ef4444;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            color: var(--text-sub);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>Dashboard</h1>
+        
+        <!-- Date & Time -->
+        <div class="section">
+            <div class="label">Current Date & Time</div>
+            <div id="datetime" class="value">Loading clock...</div>
+        </div>
+
+        <!-- Coordinates -->
+        <div class="section">
+            <div class="label">GPS Coordinates</div>
+            <div id="coordinates" class="value loading">Acquiring GPS fix...</div>
+        </div>
+
         <!-- Location -->
         <div class="section">
             <div class="label">Location</div>
