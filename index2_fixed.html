@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location & Weather Dashboard (Fixed)</title>
+    <!-- Open Location Code (Plus Codes) Official Library (fixed CDN URL) -->
+    <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/open-location-code.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .dashboard {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 25px;
+            text-align: center;
+            color: var(--accent);
+            border-bottom: 1px solid #334155;
+            padding-bottom: 15px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .data-box {
+            background: rgba(15, 23, 42, 0.4);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .huge-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .error {
+            color: #ef4444;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <h1>Live Dashboard (Fixed)</h1>
+
+        <!-- Time & Date Section -->
+        <div class="section">
+            <div class="section-title">Time & Date</div>
+            <div class="grid">
+                <div class="data-box">
+                    <div class="label">Current Time</div>
+                    <div id="time" class="value">Loading...</div>
+                </div>
+                <div class="data-box">
+                    <div class="label">Current Date</div>
+                    <div id="date" class="value">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Location Section -->
+        <div class="section">
+            <div class="section-title">GPS Location</div>
+            <div class="grid">
+                <div class="data-box">
+                    <div class="label">Latitude</div>
+                    <div id="lat" class="value">Waiting...</div>
+                </div>
+                <div class="data-box">
+                    <div class="label">Longitude</div>
+                    <div id="lon" class="value">Waiting...</div>
+                </div>
+                <div class="data-box full-width">
+                    <div class="label">Google Plus Code</div>
+                    <div id="plus-code" class="value">Waiting...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Section -->
+        <div class="section">
+            <div class="section-title">Wind Conditions</div>
+            <div class="grid">
+                <div class="data-box full-width">
+                    <div class="label">Wind Speed</div>
+                    <div id="wind-speed" class="huge-value">Waiting...</div>
+                </div>
+                <div class="data-box">
+                    <div class="label">Direction</div>
+                    <div id="wind-dir" class="value">Waiting...</div>
+                </div>
+                <div class="data-box">
+                    <div class="label">Gusts</div>
+                    <div id="wind-gusts" class="value">Waiting...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="error-msg" class="error"></div>
+    </div>
+
+    <script>
+        // --- 1. Clock and Date Functionality ---
+        function updateClock() {
+            const now = new Date();
+
+            // Format Time (HH:MM:SS)
+            document.getElementById('time').textContent = now.toLocaleTimeString();
+
+            // Format Date (Weekday, Month Day, Year)
+            document.getElementById('date').textContent = now.toLocaleDateString(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock(); // Initial run
+
+        // --- 2. Geolocation and Plus Code Functionality ---
+        function initLocation() {
+            if (!navigator.geolocation) {
+                document.getElementById('error-msg').textContent = "Geolocation is not supported by your browser.";
+                return;
+            }
+
+            // Watch position updates live
+            navigator.geolocation.watchPosition(successLocation, errorLocation, {
+                enableHighAccuracy: true,
+                timeout: 10000
+            });
+        }
+
+        function successLocation(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            document.getElementById('lat').textContent = lat.toFixed(6);
+            document.getElementById('lon').textContent = lon.toFixed(6);
+
+            // Generate Google Plus Code (Full Global Code)
+            if (typeof OpenLocationCode !== 'undefined') {
+                try {
+                    const plusCode = OpenLocationCode.encode(lat, lon);
+                    document.getElementById('plus-code').textContent = plusCode;
+                } catch (e) {
+                    console.warn('OpenLocationCode.encode failed', e);
+                    document.getElementById('plus-code').textContent = 'Error generating plus code';
+                }
+            } else {
+                document.getElementById('plus-code').textContent = "Error loading library";
+            }
+
+            // Fetch Weather using the GPS Coordinates
+            fetchWindData(lat, lon);
+        }
+
+        function errorLocation(error) {
+            let msg = "Location access denied or unavailable.";
+            if (error && error.code === error.PERMISSION_DENIED) {
+                msg = "Please enable location services to view GPS and Wind data.";
+            }
+            document.getElementById('error-msg').textContent = msg;
+        }
+
+        // --- 3. Wind Data API Fetching (fixed) ---
+        async function fetchWindData(lat, lon) {
+            try {
+                // Correct Open-Meteo endpoint and parameters.
+                // - current_weather=true gives current windspeed and winddirection (windspeed in key 'windspeed').
+                // - hourly=windgusts_10m returns gusts for hourly timestamps; we'll pick the one that matches current_weather.time.
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=windgusts_10m&windspeed_unit=mph&timezone=auto`;
+                const response = await fetch(url);
+
+                if (!response.ok) throw new Error(`Weather data fetch failed (${response.status})`);
+
+                const data = await response.json();
+
+                // current_weather fields: winds peeds are in data.current_weather.windspeed and data.current_weather.winddirection
+                const current = data.current_weather;
+                if (!current) throw new Error("No current_weather in API response");
+
+                // Helper to convert degrees to compass cardinal direction
+                const degreesToCompass = (deg) => {
+                    if (deg == null || isNaN(deg)) return "N/A";
+                    const idx = Math.floor((deg / 22.5) + 0.5) % 16;
+                    const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+                    return `${arr[idx]} (${Math.round(deg)}°)`;
+                };
+
+                // Extract gusts (if available) by matching current time to hourly.time index
+                let gustsDisplay = "N/A";
+                if (data.hourly && Array.isArray(data.hourly.time) && Array.isArray(data.hourly.windgusts_10m)) {
+                    const currentTime = current.time; // e.g. "2026-06-23T12:00"
+                    const idx = data.hourly.time.indexOf(currentTime);
+                    if (idx !== -1 && data.hourly.windgusts_10m[idx] != null) {
+                        gustsDisplay = `${data.hourly.windgusts_10m[idx]} mph`;
+                    } else {
+                        // fallback: use last hourly value available
+                        const last = data.hourly.windgusts_10m[data.hourly.windgusts_10m.length - 1];
+                        if (last != null) gustsDisplay = `${last} mph`;
+                    }
+                }
+
+                // Update UI elements
+                document.getElementById('wind-speed').textContent = `${current.windspeed} mph`;
+                document.getElementById('wind-dir').textContent = degreesToCompass(current.winddirection);
+                document.getElementById('wind-gusts').textContent = gustsDisplay;
+                document.getElementById('error-msg').textContent = ""; // Clear errors if successful
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('wind-speed').textContent = "Error";
+                document.getElementById('wind-dir').textContent = "Error";
+                document.getElementById('wind-gusts').textContent = "Error";
+                document.getElementById('error-msg').textContent = "Unable to fetch wind data.";
+            }
+        }
+
+        // Start the application
+        initLocation();
+    </script>
+</body>
+</html>
