@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Location & Weather Dashboard</title>
-    <!-- Open Location Code (Plus Codes) Official Library CDN -->
-    <script src="https://jsdelivr.net"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -176,16 +174,52 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // --- 2. Geolocation Init ---
+        // --- 2. Pure JS Google Plus Code Encoder (Zero Dependencies) ---
+        function encodePlusCode(latitude, longitude) {
+            const ALPHABET = "23456789CFGHJMPQRVWX";
+            
+            // Limit latitude and longitude to valid ranges
+            let lat = Math.min(Math.max(latitude, -90), 90);
+            let lon = longitude;
+            while (lon < -180) lon += 360;
+            while (lon >= 180) lon -= 360;
+
+            // Collapse lat/lon into coordinate space
+            if (lat === 90) lat = lat - 0.0000001;
+
+            let code = "";
+            
+            // Compute pairs (First 10 characters / 5 pairs)
+            let latVal = lat + 90;
+            let lonVal = lon + 180;
+
+            for (let i = 0; i < 5; i++) {
+                let digitPlace = Math.pow(20, 4 - i);
+                
+                let latDigit = Math.floor(latVal / digitPlace);
+                latVal -= latDigit * digitPlace;
+                
+                let lonDigit = Math.floor(lonVal / digitPlace);
+                lonVal -= lonDigit * digitPlace;
+                
+                code += ALPHABET[latDigit] + ALPHABET[lonDigit];
+                
+                if (i === 3) code += "+"; // Inject separator after 8th digit
+            }
+            
+            return code;
+        }
+
+        // --- 3. Geolocation Core ---
         function initLocation() {
             if (!navigator.geolocation) {
                 document.getElementById('error-msg').textContent = "Geolocation is not supported by this browser.";
                 return;
             }
-            // Requests permissions and listens for changes
+            
             navigator.geolocation.watchPosition(successLocation, errorLocation, {
                 enableHighAccuracy: true,
-                timeout: 15000,
+                timeout: 10000,
                 maximumAge: 0
             });
         }
@@ -197,47 +231,38 @@
             document.getElementById('lat').textContent = lat.toFixed(6);
             document.getElementById('lon').textContent = lon.toFixed(6);
 
-            // FIX: Accessing the nested encode method matching the modern library structure
+            // Calculate Plus Code locally with zero network reliance
             try {
-                if (typeof OpenLocationCode !== 'undefined' && OpenLocationCode.OpenLocationCode) {
-                    const codeEngine = OpenLocationCode.OpenLocationCode;
-                    const plusCode = codeEngine.encode(lat, lon);
-                    document.getElementById('plus-code').textContent = plusCode;
-                } else {
-                    document.getElementById('plus-code').textContent = "Library Structure Error";
-                }
+                const globalPlusCode = encodePlusCode(lat, lon);
+                document.getElementById('plus-code').textContent = globalPlusCode;
             } catch (e) {
-                console.error("Plus code parsing error:", e);
-                document.getElementById('plus-code').textContent = "Encoding Failed";
+                document.getElementById('plus-code').textContent = "Calculation Error";
             }
 
-            // Fetch wind conditions using current coordinates
+            // Sync weather data
             fetchWindData(lat, lon);
         }
 
         function errorLocation(error) {
-            let msg = "Location error: Access denied or timed out.";
+            let msg = "GPS Signal Error. Check device location permissions.";
             if (error.code === 1) {
-                msg = "Please allow location access in your browser pop-up to fetch GPS and weather details.";
+                msg = "Please allow location permissions in your browser bar.";
+            } else if (error.code === 3) {
+                msg = "GPS tracking timed out. Retrying link...";
             }
             document.getElementById('error-msg').textContent = msg;
         }
 
-        // --- 3. Weather Fetching ---
+        // --- 4. Weather Sync ---
         async function fetchWindData(lat, lon) {
             try {
                 const url = `https://open-meteo.com{lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph`;
                 const response = await fetch(url);
-                
-                if (!response.ok) throw new Error("Server response failed.");
+                if (!response.ok) throw new Error();
                 
                 const data = await response.json();
-                
-                if (!data.current) throw new Error("Invalid API payload context.");
-                
                 const current = data.current;
 
-                // Converts degrees to visual cardinal indicators
                 const degreesToCompass = (deg) => {
                     const idx = Math.floor((deg / 22.5) + 0.5) % 16;
                     const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
@@ -250,15 +275,14 @@
                 document.getElementById('error-msg').textContent = ""; 
 
             } catch (error) {
-                console.error("Weather error:", error);
-                document.getElementById('wind-speed').textContent = "Unavailable";
-                document.getElementById('wind-dir').textContent = "Unavailable";
-                document.getElementById('wind-gusts').textContent = "Unavailable";
-                document.getElementById('error-msg').textContent = "Weather sync error: Ensure you are connected to the internet.";
+                document.getElementById('wind-speed').textContent = "Offline";
+                document.getElementById('wind-dir').textContent = "Offline";
+                document.getElementById('wind-gusts').textContent = "Offline";
+                document.getElementById('error-msg').textContent = "Weather server unreachable. Checking connection...";
             }
         }
 
-        // Run App
+        // Boot
         initLocation();
     </script>
 </body>
